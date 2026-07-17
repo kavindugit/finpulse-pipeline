@@ -1,0 +1,12 @@
+finpulse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres          # Docker service name — resolves inside the container
+      port: 5432
+      user: airflow
+      password: airflow
+      dbname: finpulse        # Our application DB (not the Airflow metadata DB)
+      schema: public          # dbt will create staging/marts schemas automatically
+      threads: 4

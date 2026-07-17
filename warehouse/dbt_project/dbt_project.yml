@@ -1,0 +1,28 @@
+name: finpulse
+version: '1.0.0'
+config-version: 2
+
+# The profile to use (matches profiles.yml)
+profile: finpulse
+
+# Paths
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+# Materialization defaults per layer
+models:
+  finpulse:
+    staging:
+      # Staging models are cheap views — they always reflect the latest source
+      # data without duplicating storage. Only the marts are materialized as
+      # physical tables for fast BI dashboard queries.
+      +materialized: view
+      +schema: staging
+    marts:
+      # Marts are tables — Superset queries these directly; they must be fast.
+      +materialized: table
+      +schema: marts
