@@ -1,0 +1,2 @@
+# Exclude the massive raw CSV file from Docker context
+paysim_seed/*.csv

@@ -1,0 +1,9 @@
+# confluent-kafka is used inside Docker (Linux wheels available).
+# For local Windows dev without a C compiler, kafka-python-ng is used instead.
+# The producer auto-detects which library is available at startup.
+confluent-kafka==2.4.0; sys_platform != 'win32'
+kafka-python-ng>=2.2.3; sys_platform == 'win32'
+Faker==25.8.0
+pandas==2.2.2
+numpy==1.26.4
+pyarrow==16.1.0
