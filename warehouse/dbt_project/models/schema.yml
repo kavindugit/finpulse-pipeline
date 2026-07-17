@@ -1,0 +1,213 @@
+version: 2
+
+# =============================================================================
+# Sources
+# =============================================================================
+# Sources tell dbt where our raw data comes from. This means dbt can:
+#   1. Generate lineage diagrams showing "Postgres source → staging → marts"
+#   2. Run freshness checks (warn if data is stale)
+#   3. Let us use {{ source('...', '...') }} in SQL instead of hardcoded names
+
+sources:
+  - name: finpulse_raw
+    description: "Raw operational tables in the finpulse Postgres database."
+    database: finpulse
+    schema: public
+    tables:
+      - name: flagged_transactions
+        description: "Real-time fraud flags written by Spark Structured Streaming."
+        columns:
+          - name: transaction_id
+            description: "Unique transaction identifier."
+            tests:
+              - unique
+              - not_null
+          - name: amount
+            description: "Transaction amount in USD."
+            tests:
+              - not_null
+
+      - name: daily_fraud_summary
+        description: "Daily aggregate stats produced by the Airflow reconciliation task."
+        columns:
+          - name: summary_date
+            description: "The calendar date this summary covers (PK)."
+            tests:
+              - unique
+              - not_null
+
+      - name: kaggle_loans
+        description: "Bundled Kaggle credit-risk dataset loaded by Airflow."
+        columns:
+          - name: loan_id
+            description: "Unique loan identifier (PK)."
+            tests:
+              - unique
+              - not_null
+          - name: loan_status
+            description: "0 = performing, 1 = default."
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [0, 1]
+
+      - name: cbsl_exchange_rates
+        description: "Daily USD/LKR exchange rates fetched from open.er-api.com."
+        columns:
+          - name: rate_date
+            description: "The date this rate applies to (PK)."
+            tests:
+              - unique
+              - not_null
+          - name: usd_lkr_rate
+            description: "USD to LKR conversion rate."
+            tests:
+              - not_null
+
+# =============================================================================
+# Staging Models
+# =============================================================================
+
+models:
+  - name: stg_flagged_transactions
+    description: >
+      Clean staging view of flagged_transactions. Coalesces NULLs,
+      adds event_date column, and exposes all columns under consistent names.
+    columns:
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+      - name: amount
+        tests:
+          - not_null
+      - name: event_date
+        tests:
+          - not_null
+
+  - name: stg_daily_fraud_summary
+    description: >
+      Clean staging view of daily_fraud_summary. Adds computed fraud_rate_pct.
+    columns:
+      - name: summary_date
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_kaggle_loans
+    description: >
+      Clean staging view of kaggle_loans. Maps integer loan_status to a label,
+      normalizes loan_grade to uppercase.
+    columns:
+      - name: loan_id
+        tests:
+          - unique
+          - not_null
+      - name: loan_status
+        tests:
+          - accepted_values:
+              values: [0, 1]
+
+  - name: stg_cbsl_exchange_rates
+    description: "Clean staging view of cbsl_exchange_rates. Pass-through."
+    columns:
+      - name: rate_date
+        tests:
+          - unique
+          - not_null
+
+# =============================================================================
+# Marts Models
+# =============================================================================
+
+  - name: dim_date
+    description: >
+      Date dimension: one row per distinct event date found in flagged
+      transactions. Pre-computes year, month, day_of_week, is_weekend, etc.
+    columns:
+      - name: date_key
+        description: "Integer surrogate key (YYYYMMDD format)."
+        tests:
+          - unique
+          - not_null
+      - name: full_date
+        tests:
+          - not_null
+      - name: is_weekend
+        tests:
+          - not_null
+
+  - name: dim_account
+    description: >
+      Account dimension: one row per unique origin account that has been
+      flagged. Includes pre-aggregated risk metrics.
+    columns:
+      - name: account_key
+        description: "MD5 surrogate key of account_id."
+        tests:
+          - unique
+          - not_null
+      - name: total_flags
+        tests:
+          - not_null
+
+  - name: dim_rule
+    description: >
+      Rule dimension: one row per distinct fraud rule name with a
+      human-readable description.
+    columns:
+      - name: rule_key
+        description: "MD5 surrogate key of rule_name."
+        tests:
+          - unique
+          - not_null
+      - name: rule_name
+        tests:
+          - not_null
+
+  - name: fact_fraud_events
+    description: >
+      Central fact table of the star schema. One row per flagged transaction,
+      with foreign keys to dim_date, dim_account, dim_rule, and
+      LKR-converted amounts from the latest CBSL exchange rate.
+    columns:
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+      - name: amount_usd
+        tests:
+          - not_null
+      - name: amount_lkr
+        tests:
+          - not_null
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      - name: account_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_account')
+              field: account_key
+      - name: rule_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_rule')
+              field: rule_key
+
+  - name: mart_loan_risk
+    description: >
+      Loan risk mart aggregated by grade + intent. Includes default rate %,
+      average loan amount in USD and LKR, and average interest rate.
+    columns:
+      - name: loan_grade
+        tests:
+          - not_null
+      - name: default_rate_pct
+        tests:
+          - not_null
