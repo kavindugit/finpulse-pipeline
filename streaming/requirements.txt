@@ -1,0 +1,7 @@
+# FinPulse streaming requirements
+# Installed INSIDE the Docker container only.
+# The bitnami/spark image already has PySpark; this file exists for
+# IDE type-checking and any host-side tooling.
+
+pyspark==3.5.1
+psycopg2-binary>=2.9
