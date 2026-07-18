@@ -102,7 +102,7 @@ Apache Superset connects directly to the dbt marts schema to visualize the data.
 
 ## 📸 Screenshots Gallery
 
-*(Note: Replace these placeholder paths with actual screenshots of your running environment!)*
+
 
 ### Apache Airflow (Pipeline Orchestration)
 ![Airflow DAGs](docs/images/airflow_dags_placeholder.png)
@@ -130,7 +130,7 @@ Apache Superset connects directly to the dbt marts schema to visualize the data.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/finpulse-pipeline.git
+   git clone https://github.com/kavindugit/finpulse-pipeline.git
    cd finpulse-pipeline
    ```
 
