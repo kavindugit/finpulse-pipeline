@@ -17,11 +17,10 @@ Architecture:
   ┌──────────────────▼─────────────────────────┐
   │  1. Parse JSON (strict schema)             │
   │  2. Watermark 10 min on event_time         │
-  │  3. Sliding window 5 min / 1 min           │
+  │  3. Micro-batch group-by (Latency over State)│
   │     - tx_count_5m, total_amount_5m,        │
   │       max_amount_5m  per nameOrig          │
-  │  4. Join windowed stats back to raw rows   │
-  │  5. Apply rule engine → rule_name          │
+  │  4. Apply rule engine → rule_name          │
   └────────────┬─────────────────┬─────────────┘
                │                 │
      ┌─────────▼──────┐  ┌───────▼──────────┐
@@ -164,41 +163,6 @@ def read_kafka(spark: SparkSession) -> DataFrame:
     )
     return parsed
 
-
-# ---------------------------------------------------------------------------
-# Windowed aggregations
-# ---------------------------------------------------------------------------
-def compute_window_stats(df: DataFrame) -> DataFrame:
-    """
-    Compute per-account sliding window statistics.
-
-    Window: 5 minutes wide, sliding every 1 minute.
-    Watermark: tolerate up to 10 minutes of late data.
-
-    Returns a DataFrame with one row per (window, nameOrig) combination
-    plus aggregated stats.
-    """
-    return (
-        df
-        .withWatermark("event_time", "10 minutes")
-        .groupBy(
-            F.window("event_time", "5 minutes", "1 minute"),
-            F.col("nameOrig")
-        )
-        .agg(
-            F.count("*").alias("tx_count_5m"),
-            F.sum("amount").alias("total_amount_5m"),
-            F.max("amount").alias("max_amount_5m"),
-        )
-        .select(
-            F.col("window.start").alias("window_start"),
-            F.col("window.end").alias("window_end"),
-            F.col("nameOrig"),
-            F.col("tx_count_5m"),
-            F.col("total_amount_5m"),
-            F.col("max_amount_5m"),
-        )
-    )
 
 
 # ---------------------------------------------------------------------------
