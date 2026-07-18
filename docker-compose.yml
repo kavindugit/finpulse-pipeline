@@ -12,6 +12,7 @@ x-airflow-common:
     # Packages required by the batch ingest tasks and dbt
     _PIP_ADDITIONAL_REQUIREMENTS: 'boto3 pandas pyarrow psycopg2-binary dbt-postgres dbt-core'
     # Env vars forwarded to PythonOperator tasks
+    AIRFLOW__WEBSERVER__WEB_SERVER_MASTER_TIMEOUT: '300'
     S3_ENDPOINT: http://minio:9000
     AWS_ACCESS_KEY_ID: minioadmin
     AWS_SECRET_ACCESS_KEY: minioadmin
@@ -83,8 +84,8 @@ services:
       test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
       interval: 10s
       timeout: 10s
-      retries: 10
-      start_period: 30s
+      retries: 20
+      start_period: 60s
 
   # ---------------------------------------------------------------------------
   # Section 1: Synthetic transaction generator
@@ -139,8 +140,9 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
   # One-shot container: creates the 'finpulse' bucket on first boot
   minio-init:
@@ -256,7 +258,7 @@ services:
       DATABASE_URL: 'postgresql+psycopg2://airflow:airflow@postgres/airflow'
     volumes:
       - superset-home:/app/superset_home
-    command: superset run -p 8088 --with-threads --reload --debugger
+    command: superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger
     restart: unless-stopped
 
 volumes:
