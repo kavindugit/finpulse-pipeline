@@ -18,7 +18,7 @@
 The pipeline utilizes a hybrid streaming and batch approach:
 
 ```mermaid
-flowchart LR
+flowchart TD
     %% Colors and Styles
     classDef generator fill:#f9f9f9,stroke:#333,stroke-width:2px;
     classDef stream fill:#ff9900,stroke:#333,stroke-width:2px,color:#fff;
